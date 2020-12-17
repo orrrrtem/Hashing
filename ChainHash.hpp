@@ -7,72 +7,40 @@
 
 #pragma once
 
+#include <iostream>
 #include <string>
+#include <math.h>
+#include <random>
+#include <array>
+#include <random>
+
+#include "hash_base.hpp"
+#include "universal_hashing.hpp"
+#include "chain_hash_cell.hpp"
 
 using namespace std;
 
-template<typename KeyType, typename ValueType>
-class hash_element {
-public:
-    hash_element() = default;
-    hash_element(KeyType key,const ValueType& value) : key(key), value(value) {
-        next = nullptr;
-    }
-    
-    const KeyType& get_key() const {
-        return key;
-    }
-
-    const ValueType& get_value() const {
-        return value;
-    }
-
-    hash_element* get_next() const {
-        return next;
-    }
-    auto& set_value (ValueType value) {
-        value = value;
-        return *this;
-    }
-
-    auto& set_next( hash_element* next) {
-        next = next;
-        return *this;
-    }
-
-
-private:
-    hash_element(const hash_element &&);
-    hash_element& operator=(const hash_element &&);
-    KeyType key;
-    ValueType value;
-    hash_element *next = nullptr;
-
-};
-
-template<typename KeyType = int32_t, typename ValueType = int32_t>
-class hash_table {
+template<typename KeyType = uint32_t, typename ValueType = uint32_t>
+class chain_hash: public hash_base<KeyType, ValueType> {
 public:
     using cell = hash_element<KeyType, ValueType>;
 
-    hash_table() = default;
+    chain_hash() = default;
 
-    hash_table(size_t count) : table_size(count) {
+    chain_hash(uint32_t count, hash_function<KeyType>* hash_func) : table_size(count), hash_func(hash_func) {
         table = new cell* [count];
+        hash_func->table_size = table_size;
+
     }
 
-    virtual ~hash_table() {
-        if (table == nullptr) {
+    virtual ~chain_hash() {
+        if (table != nullptr) {
             delete [] table;
         }
     }
 
-     ValueType hash_func(KeyType value) {
-        return value % table_size;
-    }
-
-    void insert(KeyType key, ValueType value) {
-        const auto hash_value = hash_func(key);
+    void insert(const KeyType& key, const ValueType& value) override {
+        const auto hash_value = hash_func->get_value(key);
         if (table[hash_value] == nullptr) {
             table[hash_value] = new cell(key, value);
         }
@@ -90,9 +58,41 @@ public:
         }
     }
 
+    bool search(const KeyType& key) const override {
+        const auto hash_value = hash_func->get_value(key);
+        cell *chain_entry = table[hash_value];
+        while (chain_entry != nullptr) {
+            if (chain_entry->get_key() == key) {
+                return true;
+            }
+            chain_entry = chain_entry->get_next();
+        }
+        return false;
+    }
+
+    void remove(const KeyType& key) override {
+        const auto hashValue = hash_func->get_value(key);
+        cell *entry = table[hashValue];
+        cell *prev = nullptr;
+        while (entry != nullptr && entry->get_key()!= key) {
+            prev = entry;
+            entry = entry->get_next();
+        }
+        if (entry != nullptr) {
+            if (prev != nullptr) {
+                prev->set_next(entry->get_next());
+            }
+            else {
+                table[hashValue] = entry->get_next();
+            }
+            delete entry;
+        }
+    }
+
 private:
-    size_t table_size = 0;
+    uint32_t table_size = 0;
     cell ** table;
+    hash_function<KeyType>* hash_func;
 };
 
 #endif //HASHING_CHAINHASH_HPP

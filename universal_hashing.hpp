@@ -19,6 +19,11 @@
 
 using namespace std;
 
+// https://www.planetmath.org/goodhashtableprimes
+array<uint32_t, 20> prime_to_choose = {53, 97, 193, 389, 769,
+                                       1543, 3079, 6151, 12289, 24593,
+                                       49157, 98317, 196613, 393241, 786433,
+                                       1572869, 3145739, 6291469, 12582917, 25165843 };
 template<typename KeyType>
 struct universal_hash_function: public hash_function<KeyType> {
 
@@ -53,10 +58,11 @@ struct universal_hash_function: public hash_function<KeyType> {
         return fast_mod(fast_mod(a * key + b, prime), this->get_table_size());
     }
     // https://www.planetmath.org/goodhashtableprimes
-    array<uint32_t, 20> prime_to_choose = {53, 97, 193, 389, 769,
-                                           1543, 3079, 6151, 12289, 24593,
-                                           49157, 98317, 196613, 393241, 786433,
-                                           1572869, 3145739, 6291469, 12582917, 25165843 };
+//    array<uint32_t, 20> prime_to_choose = {53, 97, 193, 389, 769,
+//                                           1543, 3079, 6151, 12289, 24593,
+//                                           49157, 98317, 196613, 393241, 786433,
+//                                           1572869, 3145739, 6291469, 12582917, 25165843 };
+
     uint32_t prime = prime_to_choose[14];
     uint32_t a;
     uint32_t b;
@@ -78,7 +84,23 @@ void universal_hash_function<string>::update() {
     h_++;
 }
 
+inline uint32_t get_x2_prime(uint32_t count) {
+    for(auto prime_try: prime_to_choose) {
+        if (prime_try > 2 * count) {
+            return prime_try;
+        }
+    }
+}
 
+inline uint32_t get_less_prime(uint32_t count) {
+    auto nearest = 2;
+    for(auto prime_try: prime_to_choose) {
+        if (prime_try >= count) {
+            return nearest;
+        }
+        nearest = prime_try;
+    }
+}
 
 
 #endif //HASHING_UNIVERSAL_HASHING_HPP

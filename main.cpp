@@ -34,18 +34,34 @@ int main() {
         if (k % 10 == 0) cout << "#";
         const uint32_t capacity  = 2 * i;
         universal_hash_function<uint32_t> hash_func(capacity);
+
+        /*
         chain_hash<> chain_hash_table(capacity, &hash_func);
         fill_hash_table(chain_hash_table, keys.begin(), keys.begin() + i);
         chain_hash_insert.emplace_back(make_pair(measure_insert(chain_hash_table, keys.begin() + i, keys.begin() + i + 10), i));
         chain_hash_search.emplace_back(make_pair(measure_remove(chain_hash_table, keys.begin() + i + 5, keys.begin() + i + 10), i));
         chain_hash_remove.emplace_back(make_pair(measure_search(chain_hash_table, keys.begin() + i, keys.begin() + i + 10), i));
+         */
 
-        open_hash<> open_hash_table(capacity, &hash_func);
+        open_hash<> open_hash_table(capacity,probing_mode::linear, &hash_func);
         fill_hash_table(open_hash_table, keys.begin(), keys.begin() + i);
         open_hash_insert.emplace_back(make_pair(measure_insert(open_hash_table, keys.begin() + i, keys.begin() + i + 10), i));
         open_hash_search.emplace_back(make_pair(measure_remove(open_hash_table, keys.begin() + i + 5, keys.begin() + i + 10), i));
         open_hash_remove.emplace_back(make_pair(measure_search(open_hash_table, keys.begin() + i, keys.begin() + i + 10), i));
 
+        open_hash<> open_hash_table_q(capacity,probing_mode::quadratic, &hash_func);
+        fill_hash_table(open_hash_table, keys.begin(), keys.begin() + i);
+        open_hash_insert.emplace_back(make_pair(measure_insert(open_hash_table_q, keys.begin() + i, keys.begin() + i + 10), i));
+        open_hash_search.emplace_back(make_pair(measure_remove(open_hash_table_q, keys.begin() + i + 5, keys.begin() + i + 10), i));
+        open_hash_remove.emplace_back(make_pair(measure_search(open_hash_table_q, keys.begin() + i, keys.begin() + i + 10), i));
+
+        open_hash<> open_hash_table_h(capacity,probing_mode::double_h, &hash_func);
+        fill_hash_table(open_hash_table, keys.begin(), keys.begin() + i);
+        open_hash_insert.emplace_back(make_pair(measure_insert(open_hash_table_h, keys.begin() + i, keys.begin() + i + 10), i));
+        open_hash_search.emplace_back(make_pair(measure_remove(open_hash_table_h, keys.begin() + i + 5, keys.begin() + i + 10), i));
+        open_hash_remove.emplace_back(make_pair(measure_search(open_hash_table_h, keys.begin() + i, keys.begin() + i + 10), i));
+
+        /*
         universal_hash_function<uint32_t> hash_func12(2* capacity);
         universal_hash_function<uint32_t> hash_func22(2* capacity);
         cuckoo_hash<> cuckoo_hash_table(2*capacity, &hash_func12, &hash_func22);
@@ -69,6 +85,7 @@ int main() {
                 make_pair(
                         measure_std_search<map<uint32_t, uint32_t>, uint32_t >(map_table, keys.begin() + i, keys.begin() + i + 10),
                         i));
+                        */
     }
 
     cout << endl;

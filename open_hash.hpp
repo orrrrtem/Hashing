@@ -21,6 +21,8 @@
 
 using namespace std;
 
+enum class probing_mode :uint8_t  {linear, quadratic, double_h};
+
 template<typename KeyType = uint32_t, typename ValueType = uint32_t>
 class open_hash: public hash_base<KeyType, ValueType> {
 public:
@@ -28,73 +30,141 @@ public:
 
     open_hash() = default;
 
-    explicit open_hash(uint32_t count, hash_function<KeyType>* hash_func) : table_size(count), hash_func(hash_func) {
+    open_hash(uint32_t count, probing_mode mode, hash_function<KeyType>* hash_func) :
+              table_size(count), hash_func(hash_func), probing_mode_(mode) {
         hash_func->table_size = table_size;
-        table = vector<cell>(count);
-        //table = new cell* [count]();
-//        for(int i = 0; i < table_size;i++) {
-//            table[i] = new cell;
-//        }
-
+        if (probing_mode_ == probing_mode::linear) {
+            table = vector<cell>(count);
+        }
+        else {
+            table = vector<cell>(get_x2_prime(count));
+        }
     }
 
-    virtual ~open_hash() =default; //{
-//        if (table != nullptr) {
-//            for(int i = 0; i < table_size;i++) {
-//                delete table[i];
-//            }
-//            delete [] table;
-//        }
-//    }
+    auto& set_probing_mode(probing_mode value) {
+        probing_mode_ = value;
+        return *this;
+    }
+
+    virtual ~open_hash() =default;
 
     void insert(const KeyType& key, const ValueType& value) override {
-        auto hash_value = hash_func->get_value(key);
         uint32_t attempts = 0;
+        uint32_t hash_value = 0;
+        if (probing_mode_ == probing_mode::linear) {
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                hash_value = fast_mod((hash_value + 1), table_size);
+                attempts++;
+            }
+        }
+        else if (probing_mode_ == probing_mode::quadratic) { // https://en.wikipedia.org/wiki/Quadratic_probing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                hash_value = fast_mod((hash_value + c1*attempts + c2*c2*attempts), table_size);
+                attempts++;
+            }
+        }
+        else { // https://en.wikipedia.org/wiki/Double_hashing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                hash_value = fast_mod((hash_value + attempts * fast_mod(key, get_less_prime(table_size))), table_size);
+                attempts++;
+            }
+        }
 
-        while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
-            hash_value = fast_mod((hash_value + 1), table_size);
-            attempts++;
-        }
         if(attempts > num_elements_in_table) {
-            return;
+            throw "Table cannot fit more elements";
         }
-        //table[hash_value] = new cell;
         table[hash_value].set_key(key).set_value(value).set_state(state::filled);
         num_elements_in_table++;
     }
 
     bool search(const KeyType& key) const override {
-        auto hash_value = hash_func->get_value(key);
         uint32_t attempts = 0;
-        //if(table[hash_value] == nullptr) return false;
-        while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
-            if(table[hash_value].get_key() == key) {
-                return true;
+        uint32_t hash_value = 0;
+        if (probing_mode_ == probing_mode::linear) {
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    return true;
+                }
+                hash_value = fast_mod((hash_value + 1), table_size);
+                attempts++;
             }
-            hash_value = fast_mod(hash_value + 1, table_size);
-            attempts++;
+        }
+        else if (probing_mode_ == probing_mode::quadratic) { // https://en.wikipedia.org/wiki/Quadratic_probing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    return true;
+                }
+                hash_value = fast_mod((hash_value + c1 * attempts + c2 * c2 * attempts), table_size);
+                attempts++;
+            }
+        }
+        else { // https://en.wikipedia.org/wiki/Double_hashing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    return true;
+                }
+                hash_value = fast_mod((hash_value + attempts * fast_mod(key, get_less_prime(table_size))), table_size);
+                attempts++;
+            }
         }
         return false;
     }
 
     void remove(const KeyType& key) override {
-        auto hash_value = hash_func->get_value(key);
         uint32_t attempts = 0;
-        //if(table[hash_value] == nullptr) return;
-        while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
-            if(table[hash_value].get_key() == key) {
-                table[hash_value].set_state(state::empty);
+        uint32_t hash_value = 0;
+        if (probing_mode_ == probing_mode::linear) {
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    table[hash_value].set_state(state::empty);
+                }
+                hash_value = fast_mod((hash_value + 1), table_size);
+                attempts++;
             }
-            hash_value++;
-            attempts++;
+        }
+        else if (probing_mode_ == probing_mode::quadratic) { // https://en.wikipedia.org/wiki/Quadratic_probing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    table[hash_value].set_state(state::empty);
+                }
+                hash_value = fast_mod((hash_value + c1*attempts + c2*c2*attempts), table_size);
+                attempts++;
+            }
+        }
+        else { // https://en.wikipedia.org/wiki/Double_hashing
+            hash_value = hash_func->get_value(key);
+            while (table[hash_value].get_state() != state::empty && attempts <= num_elements_in_table) {
+                if(table[hash_value].get_key() == key) {
+                    table[hash_value].set_state(state::empty);
+                }
+                hash_value = fast_mod((hash_value + attempts * fast_mod(key, get_less_prime(table_size))), table_size);
+                attempts++;
+            }
         }
     }
 
 private:
+    probing_mode probing_mode_ = probing_mode::linear;
     uint32_t table_size = 0;
-    //cell ** table;
     vector<cell> table;
     hash_function<KeyType>* hash_func;
+
+    // https://en.wikipedia.org/wiki/Quadratic_probing
+    // for prime m > 2, good choice can be c1 = c2 = 1/2, c1 = c2 = 1, and c1 = 0, c2 = 1.
+    const uint32_t c1 = 0, c2 = 1;
+
+    //hash_function<KeyType>* hash_func_2;
     uint32_t num_elements_in_table = 0;
 };
+
+
+
 #endif //HASHING_OPEN_HASH_HPP
